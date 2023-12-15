@@ -6,6 +6,11 @@ export interface TextSplitterParams {
   chunkSize: number;
   chunkOverlap: number;
   keepSeparator: boolean;
+  updateMetadataFunction?: (
+    originalMetadata: Record<string, any>,
+    lineCounterIndex: number,
+    newLinesCount: number
+  ) => Record<string, any>;
   lengthFunction?:
     | ((text: string) => number)
     | ((text: string) => Promise<number>);
@@ -16,6 +21,25 @@ export type TextSplitterChunkHeaderOptions = {
   chunkOverlapHeader?: string;
   appendChunkOverlapHeader?: boolean;
 };
+
+function addLineNumbersToMetadata(
+  originalMetadata: Record<string, any>,
+  lineCounterIndex: number,
+  newLinesCount: number
+) {
+  const updatedMetadata = originalMetadata;
+  const loc = {
+    lines: {
+      from: lineCounterIndex,
+      to: lineCounterIndex + newLinesCount,
+    },
+  };
+  updatedMetadata.loc =
+    originalMetadata.loc && typeof originalMetadata.loc === "object"
+      ? { ...originalMetadata.loc, ...loc.lines }
+      : loc;
+  return originalMetadata;
+}
 
 export abstract class TextSplitter
   extends BaseDocumentTransformer
@@ -29,6 +53,8 @@ export abstract class TextSplitter
 
   keepSeparator = false;
 
+  updateMetadataFunction = addLineNumbersToMetadata;
+
   lengthFunction:
     | ((text: string) => number)
     | ((text: string) => Promise<number>);
@@ -38,6 +64,8 @@ export abstract class TextSplitter
     this.chunkSize = fields?.chunkSize ?? this.chunkSize;
     this.chunkOverlap = fields?.chunkOverlap ?? this.chunkOverlap;
     this.keepSeparator = fields?.keepSeparator ?? this.keepSeparator;
+    this.updateMetadataFunction =
+      fields?.updateMetadataFunction ?? this.updateMetadataFunction;
     this.lengthFunction =
       fields?.lengthFunction ?? ((text: string) => text.length);
     if (this.chunkOverlap >= this.chunkSize) {
@@ -128,25 +156,15 @@ export abstract class TextSplitter
         }
         const newLinesCount = this.numberOfNewLines(chunk);
 
-        const loc =
-          _metadatas[i].loc && typeof _metadatas[i].loc === "object"
-            ? { ..._metadatas[i].loc }
-            : {};
-        loc.lines = {
-          from: lineCounterIndex,
-          to: lineCounterIndex + newLinesCount,
-        };
-        const metadataWithLinesNumber = {
-          ..._metadatas[i],
-          loc,
-        };
+        const updatedMetadata = this.updateMetadataFunction(
+          { ..._metadatas[i] },
+          lineCounterIndex,
+          newLinesCount
+        );
 
         pageContent += chunk;
         documents.push(
-          new Document({
-            pageContent,
-            metadata: metadataWithLinesNumber,
-          })
+          new Document({ pageContent, metadata: updatedMetadata })
         );
         lineCounterIndex += newLinesCount;
         prevChunk = chunk;
