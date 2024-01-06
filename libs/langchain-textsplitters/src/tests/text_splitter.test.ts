@@ -512,3 +512,28 @@ test("Test lines loc on iterative text splitter.", async () => {
 
   expect(docs).toEqual(expectedDocs);
 });
+
+test("Should update `loc.lines` if present", async () => {
+  const text = `Hi.\nI'm Harrison.\n\nHow?\na\nb`;
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 20,
+    chunkOverlap: 1,
+  });
+  const docs = await splitter.createDocuments(
+    [text],
+    [{ loc: { lines: { from: 33, to: 39 } } }]
+  );
+
+  const expectedDocs = [
+    new Document({
+      pageContent: "Hi.\nI'm Harrison.",
+      metadata: { loc: { lines: { from: 1, to: 2 } } },
+    }),
+    new Document({
+      pageContent: "How?\na\nb",
+      metadata: { loc: { lines: { from: 4, to: 6 } } },
+    }),
+  ];
+
+  expect(docs).toEqual(expectedDocs);
+});
