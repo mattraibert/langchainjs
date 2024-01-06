@@ -15,7 +15,11 @@ export interface TextSplitterParams {
     | ((text: string) => Promise<number>);
 }
 
-export type ChunkMetadata = { lineCounterIndex: number; newLinesCount: number };
+export type ChunkMetadata = {
+  lineCounterIndex: number;
+  newLinesCount: number;
+  chunkOrdinal: number;
+};
 
 export type TextSplitterChunkHeaderOptions = {
   chunkHeader?: string;
@@ -121,7 +125,9 @@ export abstract class TextSplitter
       let lineCounterIndex = 1;
       let prevChunk = null;
       let indexPrevChunk = -1;
-      for (const chunk of await this.splitText(text)) {
+      const chunks = await this.splitText(text);
+      for (let j = 0; j < chunks.length; j += 1) {
+        const chunk = chunks[j];
         let pageContent = chunkHeader;
 
         // we need to count the \n that are in the text before getting removed by the splitting
@@ -159,7 +165,7 @@ export abstract class TextSplitter
 
         const updatedMetadata = this.updateMetadataFunction(
           { ..._metadatas[i] },
-          { lineCounterIndex, newLinesCount }
+          { lineCounterIndex, newLinesCount, chunkOrdinal: j }
         );
 
         pageContent += chunk;
