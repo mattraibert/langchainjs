@@ -46,20 +46,17 @@ export abstract class TextSplitter
 
   keepSeparator = false;
 
-  updateMetadataFunction: (
-    documentMetadata: Record<string, any>,
-    TextChunkContext: TextChunkContext
-  ) => Record<string, any>;
+  updateMetadataFunction: UpdateMetadataFunction;
 
   addLineNumbersToMetadata(
     documentMetadata: Record<string, any>,
-    { chunkStartLine, chunkLineCount }: TextChunkContext
+    textChunkContext: TextChunkContext
   ) {
     const updatedMetadata = documentMetadata;
     const loc = {
       lines: {
-        from: chunkStartLine,
-        to: chunkStartLine + chunkLineCount,
+        from: textChunkContext.chunkStartLine,
+        to: textChunkContext.chunkStartLine + textChunkContext.chunkLineCount,
       },
     };
     updatedMetadata.loc =
@@ -79,7 +76,8 @@ export abstract class TextSplitter
     this.chunkOverlap = fields?.chunkOverlap ?? this.chunkOverlap;
     this.keepSeparator = fields?.keepSeparator ?? this.keepSeparator;
     this.updateMetadataFunction =
-      fields?.updateMetadataFunction ?? this.addLineNumbersToMetadata;
+      fields?.updateMetadataFunction ??
+      this.addLineNumbersToMetadata.bind(this);
     this.lengthFunction =
       fields?.lengthFunction ?? ((text: string) => text.length);
     if (this.chunkOverlap >= this.chunkSize) {
