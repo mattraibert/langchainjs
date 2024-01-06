@@ -514,15 +514,15 @@ test("Test lines loc on iterative text splitter.", async () => {
 });
 
 test("Should update `loc.lines` if present", async () => {
-  const text = `Hi.\nI'm Harrison.\n\nHow?\na\nb`;
+  const document = new Document({
+    pageContent: `Hi.\nI'm Harrison.\n\nHow?\na\nb`,
+    metadata: { loc: { lines: { from: 33, to: 39 } } },
+  });
   const splitter = new RecursiveCharacterTextSplitter({
     chunkSize: 20,
     chunkOverlap: 1,
   });
-  const docs = await splitter.createDocuments(
-    [text],
-    [{ loc: { lines: { from: 33, to: 39 } } }]
-  );
+  const docs = await splitter.transformDocuments([document]);
 
   const expectedDocs = [
     new Document({
@@ -540,17 +540,15 @@ test("Should update `loc.lines` if present", async () => {
 
 test("can customize loc", async () => {
   const text = `Hi.\nI'm Harrison.\n\nHow?\na\nb`;
+
   const splitter = new RecursiveCharacterTextSplitter({
     chunkSize: 20,
     chunkOverlap: 1,
-    updateMetadataFunction(
-      originalMetadata: Record<string, unknown>,
-      { lineCounterIndex, newLinesCount }
-    ) {
+    updateMetadataFunction(documentMetadata, chunkMetadata) {
       return {
-        ...originalMetadata,
-        loc_from: lineCounterIndex,
-        loc_to: lineCounterIndex + newLinesCount,
+        ...documentMetadata,
+        loc_from: chunkMetadata.lineCounterIndex,
+        loc_to: chunkMetadata.lineCounterIndex + chunkMetadata.newLinesCount,
       };
     },
   });
@@ -570,33 +568,29 @@ test("can customize loc", async () => {
   expect(docs).toEqual(expectedDocs);
 });
 
-test("can add the chunk index to metadata", async () => {
-  const text = `Hi.\nI'm Harrison.\n\nHow?\na\nb`;
+test("can add the chunk ordinal to metadata", async () => {
+  const document = new Document({
+    pageContent: `Hi.\nI'm Harrison.\n\nHow?\na\nb`,
+    metadata: { id: "1" },
+  });
+
   const splitter = new RecursiveCharacterTextSplitter({
     chunkSize: 20,
     chunkOverlap: 1,
-    updateMetadataFunction(
-      originalMetadata: Record<string, any>,
-      { lineCounterIndex, newLinesCount, chunkOrdinal }
-    ) {
-      return {
-        ...originalMetadata,
-        loc_from: lineCounterIndex,
-        loc_to: lineCounterIndex + newLinesCount,
-        chunk_index: chunkOrdinal,
-      };
+    updateMetadataFunction(documentMetadata, chunkMetadata) {
+      return { id: `${documentMetadata.id}.${chunkMetadata.chunkOrdinal}` };
     },
   });
-  const docs = await splitter.createDocuments([text]);
+  const docs = await splitter.transformDocuments([document]);
 
   const expectedDocs = [
     new Document({
       pageContent: "Hi.\nI'm Harrison.",
-      metadata: { chunk_index: 0, loc_from: 1, loc_to: 2 },
+      metadata: { id: "1.1" },
     }),
     new Document({
       pageContent: "How?\na\nb",
-      metadata: { chunk_index: 1, loc_from: 4, loc_to: 6 },
+      metadata: { id: "1.2" },
     }),
   ];
 

@@ -27,22 +27,6 @@ export type TextSplitterChunkHeaderOptions = {
   appendChunkOverlapHeader?: boolean;
 };
 
-function addLineNumbersToMetadata(
-  originalMetadata: Record<string, unknown>,
-  { lineCounterIndex, newLinesCount }: ChunkMetadata
-) {
-  const updatedMetadata = originalMetadata;
-  const lines = {
-    from: lineCounterIndex,
-    to: lineCounterIndex + newLinesCount,
-  };
-  updatedMetadata.loc =
-    originalMetadata.loc && typeof originalMetadata.loc === "object"
-      ? { ...originalMetadata.loc, lines }
-      : { lines };
-  return originalMetadata;
-}
-
 export abstract class TextSplitter
   extends BaseDocumentTransformer
   implements TextSplitterParams
@@ -55,7 +39,26 @@ export abstract class TextSplitter
 
   keepSeparator = false;
 
-  updateMetadataFunction = addLineNumbersToMetadata;
+  updateMetadataFunction: (
+    originalMetadata: Record<string, unknown>,
+    chunkMetadata: ChunkMetadata
+  ) => Record<string, unknown>;
+
+  addLineNumbersToMetadata(
+    originalMetadata: Record<string, unknown>,
+    { lineCounterIndex, newLinesCount }: ChunkMetadata
+  ) {
+    const updatedMetadata = originalMetadata;
+    const lines = {
+      from: lineCounterIndex,
+      to: lineCounterIndex + newLinesCount,
+    };
+    updatedMetadata.loc =
+      originalMetadata.loc && typeof originalMetadata.loc === "object"
+        ? { ...originalMetadata.loc, lines }
+        : { lines };
+    return originalMetadata;
+  }
 
   lengthFunction:
     | ((text: string) => number)
@@ -67,7 +70,7 @@ export abstract class TextSplitter
     this.chunkOverlap = fields?.chunkOverlap ?? this.chunkOverlap;
     this.keepSeparator = fields?.keepSeparator ?? this.keepSeparator;
     this.updateMetadataFunction =
-      fields?.updateMetadataFunction ?? this.updateMetadataFunction;
+      fields?.updateMetadataFunction ?? this.addLineNumbersToMetadata;
     this.lengthFunction =
       fields?.lengthFunction ?? ((text: string) => text.length);
     if (this.chunkOverlap >= this.chunkSize) {
@@ -165,7 +168,7 @@ export abstract class TextSplitter
 
         const updatedMetadata = this.updateMetadataFunction(
           { ..._metadatas[i] },
-          { lineCounterIndex, newLinesCount, chunkOrdinal: j }
+          { lineCounterIndex, newLinesCount, chunkOrdinal: j + 1 }
         );
 
         pageContent += chunk;
