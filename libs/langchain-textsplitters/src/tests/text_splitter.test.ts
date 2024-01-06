@@ -547,8 +547,8 @@ test("can customize loc", async () => {
     updateMetadataFunction(documentMetadata, chunkMetadata) {
       return {
         ...documentMetadata,
-        loc_from: chunkMetadata.lineCounterIndex,
-        loc_to: chunkMetadata.lineCounterIndex + chunkMetadata.newLinesCount,
+        loc_from: chunkMetadata.chunkStartLine,
+        loc_to: chunkMetadata.chunkStartLine + chunkMetadata.chunkLineCount,
       };
     },
   });
@@ -578,7 +578,7 @@ test("can add the chunk ordinal to metadata", async () => {
     chunkSize: 20,
     chunkOverlap: 1,
     updateMetadataFunction(documentMetadata, chunkMetadata) {
-      return { id: `${documentMetadata.id}.${chunkMetadata.chunkOrdinal}` };
+      return { id: `${documentMetadata.id}.${chunkMetadata.textChunkOrdinal}` };
     },
   });
   const docs = await splitter.transformDocuments([document]);
