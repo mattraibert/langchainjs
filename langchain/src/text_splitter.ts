@@ -2,24 +2,31 @@ import type * as tiktoken from "js-tiktoken";
 import { Document, BaseDocumentTransformer } from "@langchain/core/documents";
 import { getEncoding } from "@langchain/core/utils/tiktoken";
 
+type TextChunkContext = {
+  chunk: string;
+  chunkStartIndex: number;
+  chunkEndIndex: number;
+  chunkStartLine: number;
+  chunkLineCount: number;
+  textOrdinal: number;
+  globalChunkOrdinal: number;
+  textChunkOrdinal: number;
+};
+
+type UpdateMetadataFunction = (
+  textMetadata: Record<string, any>,
+  context: TextChunkContext
+) => Record<string, any>;
+
 export interface TextSplitterParams {
   chunkSize: number;
   chunkOverlap: number;
   keepSeparator: boolean;
-  updateMetadataFunction?: (
-    documentMetadata: Record<string, any>,
-    chunkMetadata: ChunkMetadata
-  ) => Record<string, any>;
+  updateMetadataFunction?: UpdateMetadataFunction;
   lengthFunction?:
     | ((text: string) => number)
     | ((text: string) => Promise<number>);
 }
-
-export type ChunkMetadata = {
-  lineCounterIndex: number;
-  newLinesCount: number;
-  chunkOrdinal: number;
-};
 
 export type TextSplitterChunkHeaderOptions = {
   chunkHeader?: string;
@@ -41,18 +48,18 @@ export abstract class TextSplitter
 
   updateMetadataFunction: (
     documentMetadata: Record<string, any>,
-    chunkMetadata: ChunkMetadata
+    TextChunkContext: TextChunkContext
   ) => Record<string, any>;
 
   addLineNumbersToMetadata(
     documentMetadata: Record<string, any>,
-    { lineCounterIndex, newLinesCount }: ChunkMetadata
+    { chunkStartLine, chunkLineCount }: TextChunkContext
   ) {
     const updatedMetadata = documentMetadata;
     const loc = {
       lines: {
-        from: lineCounterIndex,
-        to: lineCounterIndex + newLinesCount,
+        from: chunkStartLine,
+        to: chunkStartLine + chunkLineCount,
       },
     };
     updatedMetadata.loc =
@@ -167,7 +174,16 @@ export abstract class TextSplitter
 
         const updatedMetadata = this.updateMetadataFunction(
           { ..._metadatas[i] },
-          { lineCounterIndex, newLinesCount, chunkOrdinal: j + 1 }
+          {
+            chunk,
+            chunkStartIndex: indexChunk,
+            chunkEndIndex: indexChunk + (await this.lengthFunction(chunk)),
+            chunkStartLine: lineCounterIndex,
+            chunkLineCount: newLinesCount,
+            textOrdinal: i + 1,
+            globalChunkOrdinal: documents.length,
+            textChunkOrdinal: j + 1,
+          }
         );
 
         pageContent += chunk;
