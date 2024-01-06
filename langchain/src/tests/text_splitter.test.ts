@@ -545,8 +545,7 @@ test("can customize loc", async () => {
     chunkOverlap: 1,
     updateMetadataFunction(
       originalMetadata: Record<string, any>,
-      lineCounterIndex: number,
-      newLinesCount: number
+      { lineCounterIndex, newLinesCount }
     ) {
       return {
         ...originalMetadata,
