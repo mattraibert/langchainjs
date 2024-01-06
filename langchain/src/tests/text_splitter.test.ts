@@ -584,3 +584,96 @@ test("can add the chunk ordinal to metadata", async () => {
 
   expect(docs).toEqual(expectedDocs);
 });
+
+test("can provide improved metadata for chunks without newlines", async () => {
+  const text =
+    "Text chunking is the process of dividing text into smaller, syntactically coherent parts or phrases. This technique is essential for structuring and understanding complex text data. By identifying meaningful chunks, such as noun phrases or verb groups, text chunking simplifies the analysis and processing of natural language.";
+  const text2 =
+    "Embeddings are a technique in natural language processing where words or phrases are converted into numerical vectors. This process captures the semantic meaning and relationships between words, enabling computers to understand and process language more effectively.";
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 100,
+    chunkOverlap: 20,
+    updateMetadataFunction(documentMetadata, chunkMetadata) {
+      return {
+        ...documentMetadata,
+        n: `${chunkMetadata.textOrdinal}.${chunkMetadata.textChunkOrdinal}`,
+        loc_from: chunkMetadata.chunkStartIndex,
+        loc_to: chunkMetadata.chunkEndIndex,
+      };
+    },
+  });
+  const output = await splitter.createDocuments([text, text2]);
+  expect(output).toEqual([
+    {
+      metadata: {
+        loc_from: 0,
+        loc_to: 100,
+        n: "1.1",
+      },
+      pageContent:
+        "Text chunking is the process of dividing text into smaller, syntactically coherent parts or phrases.",
+    },
+    {
+      metadata: {
+        loc_from: 83,
+        loc_to: 181,
+        n: "1.2",
+      },
+      pageContent:
+        "parts or phrases. This technique is essential for structuring and understanding complex text data.",
+    },
+    {
+      metadata: {
+        loc_from: 163,
+        loc_to: 257,
+        n: "1.3",
+      },
+      pageContent:
+        "complex text data. By identifying meaningful chunks, such as noun phrases or verb groups, text",
+    },
+    {
+      metadata: {
+        loc_from: 240,
+        loc_to: 326,
+        n: "1.4",
+      },
+      pageContent:
+        "verb groups, text chunking simplifies the analysis and processing of natural language.",
+    },
+    {
+      metadata: {
+        loc_from: 0,
+        loc_to: 99,
+        n: "2.1",
+      },
+      pageContent:
+        "Embeddings are a technique in natural language processing where words or phrases are converted into",
+    },
+    {
+      metadata: {
+        loc_from: 81,
+        loc_to: 179,
+        n: "2.2",
+      },
+      pageContent:
+        "are converted into numerical vectors. This process captures the semantic meaning and relationships",
+    },
+    {
+      metadata: {
+        loc_from: 162,
+        loc_to: 253,
+        n: "2.3",
+      },
+      pageContent:
+        "and relationships between words, enabling computers to understand and process language more",
+    },
+    {
+      metadata: {
+        loc_from: 240,
+        loc_to: 266,
+        n: "2.4",
+      },
+      pageContent: "language more effectively.",
+    },
+  ]);
+});
