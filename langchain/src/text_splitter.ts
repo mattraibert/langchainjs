@@ -8,13 +8,14 @@ export interface TextSplitterParams {
   keepSeparator: boolean;
   updateMetadataFunction?: (
     originalMetadata: Record<string, any>,
-    lineCounterIndex: number,
-    newLinesCount: number
+    chunkMetadata: ChunkMetadata
   ) => Record<string, any>;
   lengthFunction?:
     | ((text: string) => number)
     | ((text: string) => Promise<number>);
 }
+
+export type ChunkMetadata = { lineCounterIndex: number; newLinesCount: number };
 
 export type TextSplitterChunkHeaderOptions = {
   chunkHeader?: string;
@@ -24,8 +25,7 @@ export type TextSplitterChunkHeaderOptions = {
 
 function addLineNumbersToMetadata(
   originalMetadata: Record<string, any>,
-  lineCounterIndex: number,
-  newLinesCount: number
+  { lineCounterIndex, newLinesCount }: ChunkMetadata
 ) {
   const updatedMetadata = originalMetadata;
   const loc = {
@@ -158,8 +158,7 @@ export abstract class TextSplitter
 
         const updatedMetadata = this.updateMetadataFunction(
           { ..._metadatas[i] },
-          lineCounterIndex,
-          newLinesCount
+          { lineCounterIndex, newLinesCount }
         );
 
         pageContent += chunk;
