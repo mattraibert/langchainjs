@@ -547,8 +547,8 @@ test("can customize loc", async () => {
     updateMetadataFunction(documentMetadata, chunkMetadata) {
       return {
         ...documentMetadata,
-        loc_from: chunkMetadata.chunkStartLine,
-        loc_to: chunkMetadata.chunkStartLine + chunkMetadata.chunkLineCount,
+        loc_from: chunkMetadata.startLine,
+        loc_to: chunkMetadata.startLine + chunkMetadata.lineCount,
       };
     },
   });
@@ -578,7 +578,7 @@ test("can add the chunk ordinal to metadata", async () => {
     chunkSize: 20,
     chunkOverlap: 1,
     updateMetadataFunction(documentMetadata, chunkMetadata) {
-      return { id: `${documentMetadata.id}.${chunkMetadata.textChunkOrdinal}` };
+      return { id: `${documentMetadata.id}.${chunkMetadata.ordinal}` };
     },
   });
   const docs = await splitter.transformDocuments([document]);
@@ -608,84 +608,95 @@ test("can provide improved metadata for chunks without newlines", async () => {
     updateMetadataFunction(documentMetadata, chunkMetadata) {
       return {
         ...documentMetadata,
-        n: `${chunkMetadata.textOrdinal}.${chunkMetadata.textChunkOrdinal}`,
-        loc_from: chunkMetadata.chunkStartIndex,
-        loc_to: chunkMetadata.chunkEndIndex,
+        n: `${documentMetadata.id}.${chunkMetadata.ordinal}`,
+        loc_from: chunkMetadata.startIndex,
+        loc_to: chunkMetadata.endIndex,
       };
     },
   });
-  const output = await splitter.createDocuments([text, text2]);
+  const output = await splitter.createDocuments(
+    [text, text2],
+    [{ id: 1 }, { id: 2 }]
+  );
   expect(output).toEqual([
-    {
+    new Document({
       metadata: {
+        id: 1,
         loc_from: 0,
         loc_to: 100,
         n: "1.1",
       },
       pageContent:
         "Text chunking is the process of dividing text into smaller, syntactically coherent parts or phrases.",
-    },
-    {
+    }),
+    new Document({
       metadata: {
+        id: 1,
         loc_from: 83,
         loc_to: 181,
         n: "1.2",
       },
       pageContent:
         "parts or phrases. This technique is essential for structuring and understanding complex text data.",
-    },
-    {
+    }),
+    new Document({
       metadata: {
+        id: 1,
         loc_from: 163,
         loc_to: 257,
         n: "1.3",
       },
       pageContent:
         "complex text data. By identifying meaningful chunks, such as noun phrases or verb groups, text",
-    },
-    {
+    }),
+    new Document({
       metadata: {
+        id: 1,
         loc_from: 240,
         loc_to: 326,
         n: "1.4",
       },
       pageContent:
         "verb groups, text chunking simplifies the analysis and processing of natural language.",
-    },
-    {
+    }),
+    new Document({
       metadata: {
+        id: 2,
         loc_from: 0,
         loc_to: 99,
         n: "2.1",
       },
       pageContent:
         "Embeddings are a technique in natural language processing where words or phrases are converted into",
-    },
-    {
+    }),
+    new Document({
       metadata: {
+        id: 2,
         loc_from: 81,
         loc_to: 179,
         n: "2.2",
       },
       pageContent:
         "are converted into numerical vectors. This process captures the semantic meaning and relationships",
-    },
-    {
+    }),
+    new Document({
       metadata: {
+        id: 2,
         loc_from: 162,
         loc_to: 253,
         n: "2.3",
       },
       pageContent:
         "and relationships between words, enabling computers to understand and process language more",
-    },
-    {
+    }),
+    new Document({
       metadata: {
+        id: 2,
         loc_from: 240,
         loc_to: 266,
         n: "2.4",
       },
       pageContent: "language more effectively.",
-    },
+    }),
   ]);
 });

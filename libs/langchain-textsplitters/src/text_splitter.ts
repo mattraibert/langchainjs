@@ -4,13 +4,11 @@ import { getEncoding } from "@langchain/core/utils/tiktoken";
 
 type TextChunkContext = {
   chunk: string;
-  chunkStartIndex: number;
-  chunkEndIndex: number;
-  chunkStartLine: number;
-  chunkLineCount: number;
-  textOrdinal: number;
-  globalChunkOrdinal: number;
-  textChunkOrdinal: number;
+  startIndex: number;
+  endIndex: number;
+  startLine: number;
+  lineCount: number;
+  ordinal: number;
 };
 
 type UpdateMetadataFunction = (
@@ -54,8 +52,8 @@ export abstract class TextSplitter
   ) {
     const updatedMetadata = originalMetadata;
     const lines = {
-      from: textChunkContext.chunkStartLine,
-      to: textChunkContext.chunkStartLine + textChunkContext.chunkLineCount,
+      from: textChunkContext.startLine,
+      to: textChunkContext.startLine + textChunkContext.lineCount,
     };
     updatedMetadata.loc =
       originalMetadata.loc && typeof originalMetadata.loc === "object"
@@ -175,13 +173,11 @@ export abstract class TextSplitter
           { ..._metadatas[i] },
           {
             chunk,
-            chunkStartIndex: indexChunk,
-            chunkEndIndex: indexChunk + (await this.lengthFunction(chunk)),
-            chunkStartLine: lineCounterIndex,
-            chunkLineCount: newLinesCount,
-            textOrdinal: i + 1,
-            globalChunkOrdinal: documents.length,
-            textChunkOrdinal: j + 1,
+            startIndex: indexChunk,
+            endIndex: indexChunk + (await this.lengthFunction(chunk)),
+            startLine: lineCounterIndex,
+            lineCount: newLinesCount,
+            ordinal: j + 1,
           }
         );
 
