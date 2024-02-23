@@ -535,8 +535,8 @@ test("can customize loc", async () => {
     updateMetadataFunction(documentMetadata, chunkMetadata) {
       return {
         ...documentMetadata,
-        loc_from: chunkMetadata.chunkStartLine,
-        loc_to: chunkMetadata.chunkStartLine + chunkMetadata.chunkLineCount,
+        loc_from: chunkMetadata.startLine,
+        loc_to: chunkMetadata.startLine + chunkMetadata.lineCount,
       };
     },
   });
@@ -566,7 +566,7 @@ test("can add the chunk ordinal to metadata", async () => {
     chunkSize: 20,
     chunkOverlap: 1,
     updateMetadataFunction(documentMetadata, chunkMetadata) {
-      return { id: `${documentMetadata.id}.${chunkMetadata.textChunkOrdinal}` };
+      return { id: `${documentMetadata.id}.${chunkMetadata.ordinal}` };
     },
   });
   const docs = await splitter.transformDocuments([document]);
@@ -596,13 +596,16 @@ test("can provide improved metadata for chunks without newlines", async () => {
     updateMetadataFunction(documentMetadata, chunkMetadata) {
       return {
         ...documentMetadata,
-        n: `${chunkMetadata.textOrdinal}.${chunkMetadata.textChunkOrdinal}`,
-        loc_from: chunkMetadata.chunkStartIndex,
-        loc_to: chunkMetadata.chunkEndIndex,
+        n: `${documentMetadata.id}.${chunkMetadata.ordinal}`,
+        loc_from: chunkMetadata.startIndex,
+        loc_to: chunkMetadata.endIndex,
       };
     },
   });
-  const output = await splitter.createDocuments([text, text2]);
+  const output = await splitter.createDocuments(
+    [text, text2],
+    [{ id: 1 }, { id: 2 }]
+  );
   expect(output).toEqual([
     {
       metadata: {
