@@ -15,6 +15,7 @@ function textLineGenerator(char: string, length: number) {
 
 describe("Character text splitter", () => {
   test("Test splitting by character count.", async () => {
+    expect(1).toEqual(2);
     const text = "foo bar baz 123";
     const splitter = new CharacterTextSplitter({
       separator: " ",
