@@ -6,6 +6,11 @@ export interface TextSplitterParams {
   chunkSize: number;
   chunkOverlap: number;
   keepSeparator: boolean;
+  updateMetadataFunction?: (
+    originalMetadata: Record<string, unknown>,
+    lineCounterIndex: number,
+    newLinesCount: number
+  ) => Record<string, unknown>;
   lengthFunction?:
     | ((text: string) => number)
     | ((text: string) => Promise<number>);
@@ -16,6 +21,23 @@ export type TextSplitterChunkHeaderOptions = {
   chunkOverlapHeader?: string;
   appendChunkOverlapHeader?: boolean;
 };
+
+function addLineNumbersToMetadata(
+  originalMetadata: Record<string, unknown>,
+  lineCounterIndex: number,
+  newLinesCount: number
+) {
+  const updatedMetadata = originalMetadata;
+  const lines = {
+    from: lineCounterIndex,
+    to: lineCounterIndex + newLinesCount,
+  };
+  updatedMetadata.loc =
+    originalMetadata.loc && typeof originalMetadata.loc === "object"
+      ? { ...originalMetadata.loc, lines }
+      : { lines };
+  return originalMetadata;
+}
 
 export abstract class TextSplitter
   extends BaseDocumentTransformer
@@ -29,6 +51,8 @@ export abstract class TextSplitter
 
   keepSeparator = false;
 
+  updateMetadataFunction = addLineNumbersToMetadata;
+
   lengthFunction:
     | ((text: string) => number)
     | ((text: string) => Promise<number>);
@@ -38,6 +62,8 @@ export abstract class TextSplitter
     this.chunkSize = fields?.chunkSize ?? this.chunkSize;
     this.chunkOverlap = fields?.chunkOverlap ?? this.chunkOverlap;
     this.keepSeparator = fields?.keepSeparator ?? this.keepSeparator;
+    this.updateMetadataFunction =
+      fields?.updateMetadataFunction ?? this.updateMetadataFunction;
     this.lengthFunction =
       fields?.lengthFunction ?? ((text: string) => text.length);
     if (this.chunkOverlap >= this.chunkSize) {
@@ -75,12 +101,12 @@ export abstract class TextSplitter
   async createDocuments(
     texts: string[],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    metadatas: Record<string, any>[] = [],
+    metadatas: Record<string, unknown>[] = [],
     chunkHeaderOptions: TextSplitterChunkHeaderOptions = {}
   ): Promise<Document[]> {
     // if no metadata is provided, we create an empty one for each text
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const _metadatas: Record<string, any>[] =
+    const _metadatas: Record<string, unknown>[] =
       metadatas.length > 0
         ? metadatas
         : [...Array(texts.length)].map(() => ({}));
@@ -131,25 +157,15 @@ export abstract class TextSplitter
         }
         const newLinesCount = this.numberOfNewLines(chunk);
 
-        const loc =
-          _metadatas[i].loc && typeof _metadatas[i].loc === "object"
-            ? { ..._metadatas[i].loc }
-            : {};
-        loc.lines = {
-          from: lineCounterIndex,
-          to: lineCounterIndex + newLinesCount,
-        };
-        const metadataWithLinesNumber = {
-          ..._metadatas[i],
-          loc,
-        };
+        const updatedMetadata = this.updateMetadataFunction(
+          { ..._metadatas[i] },
+          lineCounterIndex,
+          newLinesCount
+        );
 
         pageContent += chunk;
         documents.push(
-          new Document({
-            pageContent,
-            metadata: metadataWithLinesNumber,
-          })
+          new Document({ pageContent, metadata: updatedMetadata })
         );
         lineCounterIndex += newLinesCount;
         prevChunk = chunk;

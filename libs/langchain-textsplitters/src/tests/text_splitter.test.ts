@@ -537,3 +537,36 @@ test("Should update `loc.lines` if present", async () => {
 
   expect(docs).toEqual(expectedDocs);
 });
+
+test("can customize loc", async () => {
+  const text = `Hi.\nI'm Harrison.\n\nHow?\na\nb`;
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 20,
+    chunkOverlap: 1,
+    updateMetadataFunction(
+      originalMetadata: Record<string, any>,
+      lineCounterIndex: number,
+      newLinesCount: number
+    ) {
+      return {
+        ...originalMetadata,
+        loc_from: lineCounterIndex,
+        loc_to: lineCounterIndex + newLinesCount,
+      };
+    },
+  });
+  const docs = await splitter.createDocuments([text]);
+
+  const expectedDocs = [
+    new Document({
+      pageContent: "Hi.\nI'm Harrison.",
+      metadata: { loc_from: 1, loc_to: 2 },
+    }),
+    new Document({
+      pageContent: "How?\na\nb",
+      metadata: { loc_from: 4, loc_to: 6 },
+    }),
+  ];
+
+  expect(docs).toEqual(expectedDocs);
+});
