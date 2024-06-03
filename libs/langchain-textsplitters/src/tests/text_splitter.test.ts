@@ -512,3 +512,191 @@ test("Test lines loc on iterative text splitter.", async () => {
 
   expect(docs).toEqual(expectedDocs);
 });
+
+test("Should update `loc.lines` if present", async () => {
+  const document = new Document({
+    pageContent: `Hi.\nI'm Harrison.\n\nHow?\na\nb`,
+    metadata: { loc: { lines: { from: 33, to: 39 } } },
+  });
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 20,
+    chunkOverlap: 1,
+  });
+  const docs = await splitter.transformDocuments([document]);
+
+  const expectedDocs = [
+    new Document({
+      pageContent: "Hi.\nI'm Harrison.",
+      metadata: { loc: { lines: { from: 1, to: 2 } } },
+    }),
+    new Document({
+      pageContent: "How?\na\nb",
+      metadata: { loc: { lines: { from: 4, to: 6 } } },
+    }),
+  ];
+
+  expect(docs).toEqual(expectedDocs);
+});
+
+test("can customize loc", async () => {
+  const text = `Hi.\nI'm Harrison.\n\nHow?\na\nb`;
+
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 20,
+    chunkOverlap: 1,
+    updateMetadataFunction(documentMetadata, chunkMetadata) {
+      return {
+        ...documentMetadata,
+        loc_from: chunkMetadata.startLine,
+        loc_to: chunkMetadata.startLine + chunkMetadata.lineCount,
+      };
+    },
+  });
+  const docs = await splitter.createDocuments([text]);
+
+  const expectedDocs = [
+    new Document({
+      pageContent: "Hi.\nI'm Harrison.",
+      metadata: { loc_from: 1, loc_to: 2 },
+    }),
+    new Document({
+      pageContent: "How?\na\nb",
+      metadata: { loc_from: 4, loc_to: 6 },
+    }),
+  ];
+
+  expect(docs).toEqual(expectedDocs);
+});
+
+test("can add the chunk ordinal to metadata", async () => {
+  const document = new Document({
+    pageContent: `Hi.\nI'm Harrison.\n\nHow?\na\nb`,
+    metadata: { id: "1" },
+  });
+
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 20,
+    chunkOverlap: 1,
+    updateMetadataFunction(documentMetadata, chunkMetadata) {
+      return { id: `${documentMetadata.id}.${chunkMetadata.ordinal}` };
+    },
+  });
+  const docs = await splitter.transformDocuments([document]);
+
+  const expectedDocs = [
+    new Document({
+      pageContent: "Hi.\nI'm Harrison.",
+      metadata: { id: "1.1" },
+    }),
+    new Document({
+      pageContent: "How?\na\nb",
+      metadata: { id: "1.2" },
+    }),
+  ];
+
+  expect(docs).toEqual(expectedDocs);
+});
+
+test("can provide improved metadata for chunks without newlines", async () => {
+  const text =
+    "Text chunking is the process of dividing text into smaller, syntactically coherent parts or phrases. This technique is essential for structuring and understanding complex text data. By identifying meaningful chunks, such as noun phrases or verb groups, text chunking simplifies the analysis and processing of natural language.";
+  const text2 =
+    "Embeddings are a technique in natural language processing where words or phrases are converted into numerical vectors. This process captures the semantic meaning and relationships between words, enabling computers to understand and process language more effectively.";
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 100,
+    chunkOverlap: 20,
+    updateMetadataFunction(documentMetadata, chunkMetadata) {
+      return {
+        ...documentMetadata,
+        n: `${documentMetadata.id}.${chunkMetadata.ordinal}`,
+        loc_from: chunkMetadata.startIndex,
+        loc_to: chunkMetadata.endIndex,
+      };
+    },
+  });
+  const output = await splitter.createDocuments(
+    [text, text2],
+    [{ id: 1 }, { id: 2 }]
+  );
+  expect(output).toEqual([
+    new Document({
+      metadata: {
+        id: 1,
+        loc_from: 0,
+        loc_to: 100,
+        n: "1.1",
+      },
+      pageContent:
+        "Text chunking is the process of dividing text into smaller, syntactically coherent parts or phrases.",
+    }),
+    new Document({
+      metadata: {
+        id: 1,
+        loc_from: 83,
+        loc_to: 181,
+        n: "1.2",
+      },
+      pageContent:
+        "parts or phrases. This technique is essential for structuring and understanding complex text data.",
+    }),
+    new Document({
+      metadata: {
+        id: 1,
+        loc_from: 163,
+        loc_to: 257,
+        n: "1.3",
+      },
+      pageContent:
+        "complex text data. By identifying meaningful chunks, such as noun phrases or verb groups, text",
+    }),
+    new Document({
+      metadata: {
+        id: 1,
+        loc_from: 240,
+        loc_to: 326,
+        n: "1.4",
+      },
+      pageContent:
+        "verb groups, text chunking simplifies the analysis and processing of natural language.",
+    }),
+    new Document({
+      metadata: {
+        id: 2,
+        loc_from: 0,
+        loc_to: 99,
+        n: "2.1",
+      },
+      pageContent:
+        "Embeddings are a technique in natural language processing where words or phrases are converted into",
+    }),
+    new Document({
+      metadata: {
+        id: 2,
+        loc_from: 81,
+        loc_to: 179,
+        n: "2.2",
+      },
+      pageContent:
+        "are converted into numerical vectors. This process captures the semantic meaning and relationships",
+    }),
+    new Document({
+      metadata: {
+        id: 2,
+        loc_from: 162,
+        loc_to: 253,
+        n: "2.3",
+      },
+      pageContent:
+        "and relationships between words, enabling computers to understand and process language more",
+    }),
+    new Document({
+      metadata: {
+        id: 2,
+        loc_from: 240,
+        loc_to: 266,
+        n: "2.4",
+      },
+      pageContent: "language more effectively.",
+    }),
+  ]);
+});

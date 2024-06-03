@@ -2,10 +2,25 @@ import type * as tiktoken from "js-tiktoken";
 import { Document, BaseDocumentTransformer } from "@langchain/core/documents";
 import { getEncoding } from "@langchain/core/utils/tiktoken";
 
+type TextChunkContext = {
+  chunk: string;
+  startIndex: number;
+  endIndex: number;
+  startLine: number;
+  lineCount: number;
+  ordinal: number;
+};
+
+type UpdateMetadataFunction = (
+  textMetadata: Record<string, unknown>,
+  context: TextChunkContext
+) => Record<string, unknown>;
+
 export interface TextSplitterParams {
   chunkSize: number;
   chunkOverlap: number;
   keepSeparator: boolean;
+  updateMetadataFunction?: UpdateMetadataFunction;
   lengthFunction?:
     | ((text: string) => number)
     | ((text: string) => Promise<number>);
@@ -29,6 +44,24 @@ export abstract class TextSplitter
 
   keepSeparator = false;
 
+  updateMetadataFunction: UpdateMetadataFunction;
+
+  addLineNumbersToMetadata(
+    originalMetadata: Record<string, unknown>,
+    textChunkContext: TextChunkContext
+  ) {
+    const updatedMetadata = originalMetadata;
+    const lines = {
+      from: textChunkContext.startLine,
+      to: textChunkContext.startLine + textChunkContext.lineCount,
+    };
+    updatedMetadata.loc =
+      originalMetadata.loc && typeof originalMetadata.loc === "object"
+        ? { ...originalMetadata.loc, lines }
+        : { lines };
+    return originalMetadata;
+  }
+
   lengthFunction:
     | ((text: string) => number)
     | ((text: string) => Promise<number>);
@@ -38,6 +71,9 @@ export abstract class TextSplitter
     this.chunkSize = fields?.chunkSize ?? this.chunkSize;
     this.chunkOverlap = fields?.chunkOverlap ?? this.chunkOverlap;
     this.keepSeparator = fields?.keepSeparator ?? this.keepSeparator;
+    this.updateMetadataFunction =
+      fields?.updateMetadataFunction ??
+      this.addLineNumbersToMetadata.bind(this);
     this.lengthFunction =
       fields?.lengthFunction ?? ((text: string) => text.length);
     if (this.chunkOverlap >= this.chunkSize) {
@@ -75,12 +111,12 @@ export abstract class TextSplitter
   async createDocuments(
     texts: string[],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    metadatas: Record<string, any>[] = [],
+    metadatas: Record<string, unknown>[] = [],
     chunkHeaderOptions: TextSplitterChunkHeaderOptions = {}
   ): Promise<Document[]> {
     // if no metadata is provided, we create an empty one for each text
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const _metadatas: Record<string, any>[] =
+    const _metadatas: Record<string, unknown>[] =
       metadatas.length > 0
         ? metadatas
         : [...Array(texts.length)].map(() => ({}));
@@ -95,7 +131,9 @@ export abstract class TextSplitter
       let lineCounterIndex = 1;
       let prevChunk = null;
       let indexPrevChunk = -1;
-      for (const chunk of await this.splitText(text)) {
+      const chunks = await this.splitText(text);
+      for (let j = 0; j < chunks.length; j += 1) {
+        const chunk = chunks[j];
         let pageContent = chunkHeader;
 
         // we need to count the \n that are in the text before getting removed by the splitting
@@ -131,25 +169,21 @@ export abstract class TextSplitter
         }
         const newLinesCount = this.numberOfNewLines(chunk);
 
-        const loc =
-          _metadatas[i].loc && typeof _metadatas[i].loc === "object"
-            ? { ..._metadatas[i].loc }
-            : {};
-        loc.lines = {
-          from: lineCounterIndex,
-          to: lineCounterIndex + newLinesCount,
-        };
-        const metadataWithLinesNumber = {
-          ..._metadatas[i],
-          loc,
-        };
+        const updatedMetadata = this.updateMetadataFunction(
+          { ..._metadatas[i] },
+          {
+            chunk,
+            startIndex: indexChunk,
+            endIndex: indexChunk + (await this.lengthFunction(chunk)),
+            startLine: lineCounterIndex,
+            lineCount: newLinesCount,
+            ordinal: j + 1,
+          }
+        );
 
         pageContent += chunk;
         documents.push(
-          new Document({
-            pageContent,
-            metadata: metadataWithLinesNumber,
-          })
+          new Document({ pageContent, metadata: updatedMetadata })
         );
         lineCounterIndex += newLinesCount;
         prevChunk = chunk;
